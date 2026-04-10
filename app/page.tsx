@@ -1,6 +1,7 @@
 import BookCard from '@/components/BookCard'
 import HeroSection from '@/components/HeroSection'
 
+
 const books = [
     {
         _id: "1",
