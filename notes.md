@@ -8,3 +8,9 @@ for Auth using clerk
 
 create an new account on clerk 
 create an new application on clerk
+
+
+db structure for bookshort
+atlast create a new acount
+
+bWxx6CxiTrR2BqE3

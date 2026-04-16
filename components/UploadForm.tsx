@@ -21,6 +21,7 @@ import { Button } from "./ui/button";
 import VoiceSelector from "./VoiceSelector";
 
 const UploadForm = () => {
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
   const form = useForm<BookUploadFormValues>({
     resolver: zodResolver(UploadSchema),
     defaultValues: {
@@ -32,9 +33,11 @@ const UploadForm = () => {
     },
   });
 
-  const isSubmitting = false;
 
-  const onSubmit = (data: BookUploadFormValues) => {};
+
+  const onSubmit = (data: BookUploadFormValues) => {
+    console.log("Form Data:", data);
+  };
   return (
     <>
       <div className="new-book-wrapper">
@@ -103,25 +106,26 @@ const UploadForm = () => {
               )}
             />
 
-
-                {/* 5. Voice Selector */}
-                        <FormField
-                            control={form.control}
-                            name="persona"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="form-label">Choose Assistant Voice</FormLabel>
-                                    <FormControl>
-                                        <VoiceSelector
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                            disabled={isSubmitting}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+            {/* 5. Voice Selector */}
+            <FormField
+              control={form.control}
+              name="persona"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="form-label">
+                    Choose Assistant Voice
+                  </FormLabel>
+                  <FormControl>
+                    <VoiceSelector
+                      value={field.value}
+                      onChange={field.onChange}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* 6. Submit Button */}
             <Button type="submit" className="form-btn" disabled={isSubmitting}>
