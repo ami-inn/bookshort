@@ -14,3 +14,6 @@ db structure for bookshort
 atlast create a new acount
 
 bWxx6CxiTrR2BqE3
+
+
+upload pdf using vercelblob .it will allow us to upload pdf files and get the url of the uploaded file. we can use this url to extract the content of the pdf file and save it in our database. this will also allow us to implement features like reading by page number or segment index. instead of loading entire book we can load the specific segment of book.

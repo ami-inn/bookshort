@@ -5,6 +5,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import Navbar from "@/components/Navbar";
 
 
+
 const ibmPlexSerif = IBM_Plex_Serif({
   variable: "--font-ibm-plex-serif",
   subsets: ["latin"],
