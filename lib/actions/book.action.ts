@@ -1,7 +1,7 @@
 'use server';
 import { connectToDatabase } from "@/database/mongoose";
 import { CreateBook, TextSegment } from "@/types";
-import { generateSlug, serializeData } from "../utils";
+import { escapeRegex, generateSlug, serializeData } from "../utils";
 import Book from "@/database/models/book.model";
 import BookSegment from "@/database/models/book-segment.model";
 
@@ -103,3 +103,35 @@ export const checkBookExists = async (title: string) => {
     };
   }
 };
+
+
+export const getAllBooks = async (search?: string) => {
+    try {
+        await connectToDatabase();
+
+        let query = {};
+
+        if (search) {
+            const escapedSearch = escapeRegex(search);
+            const regex = new RegExp(escapedSearch, 'i');
+            query = {
+                $or: [
+                    { title: { $regex: regex } },
+                    { author: { $regex: regex } },
+                ]
+            };
+        }
+
+        const books = await Book.find(query).sort({ createdAt: -1 }).lean();
+
+        return {
+            success: true,
+            data: serializeData(books)
+        }
+    } catch (e) {
+        console.error('Error connecting to database', e);
+        return {
+            success: false, error: e
+        }
+    }
+}
