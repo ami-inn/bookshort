@@ -5,6 +5,7 @@ import { escapeRegex, generateSlug, serializeData } from "../utils";
 import Book from "@/database/models/book.model";
 import BookSegment from "@/database/models/book-segment.model";
 import mongoose from "mongoose";
+import { revalidatePath } from "next/cache";
 
 export const createBook = async (data: CreateBook) => {
   try {
@@ -31,6 +32,8 @@ export const createBook = async (data: CreateBook) => {
       slug,
       totalSegments: 0, // initialize totalSegments to 0, will update after processing PDF
     });
+
+    revalidatePath("/"); // revalidate homepage to show the new book
 
     return { success: true, data: serializeData(book) };
   } catch (error) {
