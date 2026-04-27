@@ -1,3 +1,4 @@
+'use client';
 import { formatDuration } from "@/lib/utils";
 import { IBook } from "@/types";
 import { Mic, MicOff } from "lucide-react";
@@ -5,20 +6,27 @@ import Image from "next/image";
 import React from "react";
 import Transcript from "./Transcript";
 import { Messages } from "@/types";
+import { useVapi } from "@/hooks/useVapi";
 
 const VapiControls = ({ book }: { book: IBook }) => {
-  const isActive = false;
-  const status = "idle";
-    const duration = 0;
-    const statusDisplay = {
-        label: "Idle",
-        color: "bg-gray-400"
-    }
-    const maxDurationSeconds = 300; // 5 minutes
+  const statusDisplay = {
+    label: "Idle",
+    color: "bg-gray-400",
+  };
+  const maxDurationSeconds = 300; // 5 minutes
 
-    const messages: Messages[] = [] ;
-    const currentMessage = "";
-    const currentUserMessage = "";
+  const {
+    status,
+    isActive,
+    messages,
+    currentMessage,
+    currentUserMessage,
+    duration,
+    limitError,
+    start,
+    stop,
+    clearError,
+  } = useVapi(book);
   return (
     <>
       <div className="max-w-4xl mx-auto flex flex-col gap-8">
@@ -38,8 +46,8 @@ const VapiControls = ({ book }: { book: IBook }) => {
                 <div className="absolute inset-0 rounded-full bg-white animate-ping opacity-75" />
               )}
               <button
-                // onClick={isActive ? stop : start}
-                // disabled={status === "connecting"}
+                onClick={isActive ? stop : start}
+                 disabled={status === "connecting"}
                 className={`vapi-mic-btn shadow-md !w-[60px] !h-[60px] z-10 ${isActive ? "vapi-mic-btn-active" : "vapi-mic-btn-inactive"}`}
               >
                 {isActive ? (
@@ -73,7 +81,8 @@ const VapiControls = ({ book }: { book: IBook }) => {
 
               <div className="vapi-status-indicator">
                 <span className="vapi-status-text">
-                  {formatDuration(duration)}/{formatDuration(maxDurationSeconds)}
+                  {formatDuration(duration)}/
+                  {formatDuration(maxDurationSeconds)}
                 </span>
               </div>
             </div>
@@ -83,10 +92,10 @@ const VapiControls = ({ book }: { book: IBook }) => {
         <div className="vapi-transcript-wrapper">
           <div className="transcript-container min-h-[400px]">
             <Transcript
-                        messages={messages}
-                        currentMessage={currentMessage}
-                        currentUserMessage={currentUserMessage}
-                    />
+              messages={messages}
+              currentMessage={currentMessage}
+              currentUserMessage={currentUserMessage}
+            />
           </div>
         </div>
       </div>
