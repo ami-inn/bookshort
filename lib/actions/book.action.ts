@@ -7,108 +7,6 @@ import BookSegment from "@/database/models/book-segment.model";
 import mongoose from "mongoose";
 import { revalidatePath } from "next/cache";
 
-export const createBook = async (data: CreateBook) => {
-  try {
-    await connectToDatabase();
-
-    // generate book slug from title and author
-    const slug = generateSlug(data.title);
-
-    const existingBook = await Book.findOne({ slug }).lean(); // lean for faster query since we don't need mongoose document methods
-
-    if (existingBook) {
-      return {
-        success: true,
-        data: serializeData(existingBook),
-        alreadyExists: true,
-      };
-    }
-
-    // check the subscription limit before creating a new book
-    // todo
-
-    const book = await Book.create({
-      ...data,
-      slug,
-      totalSegments: 0, // initialize totalSegments to 0, will update after processing PDF
-    });
-
-    revalidatePath("/"); // revalidate homepage to show the new book
-
-    return { success: true, data: serializeData(book) };
-  } catch (error) {
-    console.error("Error creating book:", error);
-    return { success: false, error: "Failed to create book" };
-  }
-};
-
-// the use of segments is to store the content of the book in smaller chunks. this is because when we read the book using vapi we can read the specific segment of the book instead of loading the entire book into memory. this will improve the performance and reduce the memory usage of our application. also it will allow us to implement features like reading by page number or segment index. instead of loading entire book we can load the specific segment of book.
-export const saveBookSegment = async (
-  bookId: string,
-  clerkId: string,
-  segments: TextSegment[],
-) => {
-  try {
-    await connectToDatabase();
-
-    console.log("saving book segments");
-
-    const segmentsToInsert = segments.map((segment) => ({
-      clerkId,
-      bookId,
-      content: segment.text,
-      segmentIndex: segment.segmentIndex,
-      pageNumber: segment.pageNumber,
-      wordCount: segment.wordCount,
-    }));
-    await BookSegment.insertMany(segmentsToInsert);
-    // we are not saving the books we are extracting the content of the book and saving it in the book segment collection. this is because when we read the book using vapi we can read the specific segment of the book instead of loading the entire book into memory. this will improve the performance and reduce the memory usage of our application. also it will allow us to implement features like reading by page number or segment index. instead of loading entire book we can load the specific segment of book.
-    // update totalSegments in book document
-    await Book.findByIdAndUpdate(bookId, { totalSegments: segments.length });
-
-    console.log("book segments saved successfully");
-
-    return {
-      success: true,
-      data: {
-        segementsCreated: segments.length,
-      },
-    };
-  } catch (error) {
-    console.error("Error saving book segment:", error);
-    await BookSegment.deleteMany({ bookId }); // rollback any segments that were saved for this book
-    await Book.findByIdAndDelete(bookId); // delete the book record as well since it's incomplete without segments
-    console.log("Rolled back book and segments due to error:", error);
-    return { success: false, error: "Failed to save book segment" };
-  }
-};
-
-export const checkBookExists = async (title: string) => {
-  try {
-    await connectToDatabase();
-    const slug = generateSlug(title);
-
-    const existingBook = await Book.findOne({ slug }).lean();
-
-    if (existingBook) {
-      return {
-        exists: true,
-        data: serializeData(existingBook),
-      };
-    }
-    return {
-      exists: false,
-    };
-  } catch (error) {
-    console.error("Error checking book existence:", error);
-    return {
-      exists: false,
-      error: 0,
-    };
-  }
-};
-
-
 export const getAllBooks = async (search?: string) => {
     try {
         await connectToDatabase();
@@ -140,6 +38,90 @@ export const getAllBooks = async (search?: string) => {
     }
 }
 
+export const checkBookExists = async (title: string) => {
+    try {
+        await connectToDatabase();
+
+        const slug = generateSlug(title);
+
+        const existingBook = await Book.findOne({slug}).lean();
+
+        if(existingBook) {
+            return {
+                exists: true,
+                book: serializeData(existingBook)
+            }
+        }
+
+        return {
+            exists: false,
+        }
+    } catch (e) {
+        console.error('Error checking book exists', e);
+        return {
+            exists: false, error: e
+        }
+    }
+}
+
+export const createBook = async (data: CreateBook) => {
+    try {
+        await connectToDatabase();
+
+        const slug = generateSlug(data.title);
+
+        const existingBook = await Book.findOne({slug}).lean();
+
+        if(existingBook) {
+            return {
+                success: true,
+                data: serializeData(existingBook),
+                alreadyExists: true,
+            }
+        }
+
+        // Todo: Check subscription limits before creating a book
+        const { getUserPlan } = await import("@/lib/subscription.server");
+        const { PLAN_LIMITS } = await import("@/lib/subscription-constants");
+
+        const { auth } = await import("@clerk/nextjs/server");
+        const { userId } = await auth();
+
+        if (!userId || userId !== data.clerkId) {
+            return { success: false, error: "Unauthorized" };
+        }
+
+        const plan = await getUserPlan();
+        const limits = PLAN_LIMITS[plan];
+
+        const bookCount = await Book.countDocuments({ clerkId: userId });
+
+        if (bookCount >= limits.maxBooks) {
+            const { revalidatePath } = await import("next/cache");
+            revalidatePath("/");
+
+            return {
+                success: false,
+                error: `You have reached the maximum number of books allowed for your ${plan} plan (${limits.maxBooks}). Please upgrade to add more books.`,
+                isBillingError: true,
+            };
+        }
+
+        const book = await Book.create({...data, clerkId: userId, slug, totalSegments: 0});
+
+        return {
+            success: true,
+            data: serializeData(book),
+        }
+    } catch (e) {
+        console.error('Error creating a book', e);
+
+        return {
+            success: false,
+            error: e,
+        }
+    }
+}
 
 export const getBookBySlug = async (slug: string) => {
     try {
@@ -163,7 +145,35 @@ export const getBookBySlug = async (slug: string) => {
     }
 }
 
+export const saveBookSegments = async (bookId: string, clerkId: string, segments: TextSegment[]) => {
+    try {
+        await connectToDatabase();
 
+        console.log('Saving book segments...');
+
+        const segmentsToInsert = segments.map(({ text, segmentIndex, pageNumber, wordCount }) => ({
+            clerkId, bookId, content: text, segmentIndex, pageNumber, wordCount
+        }));
+
+        await BookSegment.insertMany(segmentsToInsert);
+
+        await Book.findByIdAndUpdate(bookId, { totalSegments: segments.length });
+
+        console.log('Book segments saved successfully.');
+
+        return {
+            success: true,
+            data: { segmentsCreated: segments.length}
+        }
+    } catch (e) {
+        console.error('Error saving book segments', e);
+
+        return {
+            success: false,
+            error: e,
+        }
+    }
+}
 
 // Searches book segments using MongoDB text search with regex fallback
 export const searchBookSegments = async (bookId: string, query: string, limit: number = 5) => {
